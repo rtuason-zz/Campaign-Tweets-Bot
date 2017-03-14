@@ -8,12 +8,13 @@ import calendar
 from dateutil import parser as dateparser
 
 import boto3
+from twython import Twython
 
 SRC_URL = 'https://stanford.edu/~rtuason/campaign_tweets.csv'
 FILENAME = 'campaign-tweets.csv'
 
-MIN_MONTH = 4
-MAX_MONTH = 9
+MIN_DATE = '4/17/16'
+MAX_DATE = '9/29/16'  # Include tweets through 9/28/16 11:59pm
 
 ######################################################################
 # General tweet functions
@@ -45,24 +46,24 @@ def get_tweet_stats(tweets):
   return retweet_avg, favorite_avg, len(tweets)
 
 ######################################################################
-# Tweet functions for a range of months
+# Tweet functions for a range of dates
 ######################################################################
 
-def filter_tweets(tweets, handle, min_month, max_month):
+def filter_tweets(tweets, handle, date1, date2):
   results = []
   for tweet in tweets:
     if tweet['handle'] == handle and tweet['is_retweet'] == 'False':
       tweet_time = dateparser.parse(tweet['time'])
-      if tweet_time.month >= min_month and tweet_time.month <= max_month:
+      if tweet_time >= date1 and tweet_time <= date2:
         results.append(tweet)
 
   return results
 
-def compare_tweets(min_month, max_month):
+def compare_tweets(date1, date2):
   tweets = read_tweets()
 
-  clinton_tweets = filter_tweets(tweets, 'HillaryClinton', min_month, max_month)
-  trump_tweets = filter_tweets(tweets, 'realDonaldTrump', min_month, max_month)
+  clinton_tweets = filter_tweets(tweets, 'HillaryClinton', date1, date2)
+  trump_tweets = filter_tweets(tweets, 'realDonaldTrump', date1, date2)
 
   clinton_stats = get_tweet_stats(clinton_tweets)
   trump_stats = get_tweet_stats(trump_tweets)
@@ -70,16 +71,13 @@ def compare_tweets(min_month, max_month):
   return clinton_stats, trump_stats
 
 ######################################################################
-# Functions for formulating a response
+# Formulate a response
 ######################################################################
-def get_month_stats(month_str):
-  date = dateparser.parse(argv[1])
-  month_str = calendar.month_name[date.month]
-  clinton_stats, trump_stats = compare_tweets(date.month)
-
-  output = "In {month} 2016, Hillary Clinton had averages of {HC_retweet_avg} retweets and {HC_favorite_avg} favorites from {HC_num_tweets} tweets, while Donald Trump had averages of {DT_retweet_avg} retweets and {DT_favorite_avg} favorites from {DT_num_tweets} tweets."
+def create_response(date1, date2, clinton_stats, trump_stats):
+  output = "From {date1} to {date2}, Hillary Clinton had averages of {HC_retweet_avg} retweets and {HC_favorite_avg} favorites from {HC_num_tweets} tweets, while Donald Trump had averages of {DT_retweet_avg} retweets and {DT_favorite_avg} favorites from {DT_num_tweets} tweets."
   output = output.format(
-    month=month_str,
+    date1=date1,
+    date2=date2,
     HC_retweet_avg=clinton_stats[0],
     HC_favorite_avg=clinton_stats[1],
     HC_num_tweets=clinton_stats[2],
@@ -89,26 +87,6 @@ def get_month_stats(month_str):
   )
 
   return output
-
-def get_all_months_stats():
-  clinton_stats, trump_stats = compare_all_tweets()
-
-  output = "From April to September 2016, Hillary Clinton had averages of {HC_retweet_avg} retweets and {HC_favorite_avg} favorites from {HC_num_tweets} tweets, while Donald Trump had averages of {DT_retweet_avg} retweets and {DT_favorite_avg} favorites from {DT_num_tweets} tweets."
-  output = output.format(
-    HC_retweet_avg=clinton_stats[0],
-    HC_favorite_avg=clinton_stats[1],
-    HC_num_tweets=clinton_stats[2],
-    DT_retweet_avg=trump_stats[0],
-    DT_favorite_avg=trump_stats[1],
-    DT_num_tweets=trump_stats[2]
-  )
-
-  return output
-  
-def print_error_message():
-  print("Provide a target month to see tweet statistics about Hillary Clinton and Donald Trump. Your target month must follow the format 'yyyy-mm' and must fall between April and September of 2016, inclusive.\n")
-  print("You may also provide a phone number to which you would like these statistics to be sent. If you provide a phone number but not a target month, statistics will be aggregated from April to September 2016. Your phone number must contain '+1' followed by ten numbers.\n")
-
 
 ######################################################################
 # Analyze user input arguments
@@ -116,90 +94,72 @@ def print_error_message():
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  parser.add_argument("--month", type=int, nargs="*")
+  parser.add_argument("--date", nargs="*")
   parser.add_argument("--phone", nargs="*")
-  parser.add_argument("--email", nargs="*")
+  parser.add_argument("--twitter", nargs="*")
   args = parser.parse_args()
 
-  if args.month:
-    if len(args.month) == 1 and args.month[0] >= MIN_MONTH and args.month[0] <= MAX_MONTH:
-      min_month = args.month[0]
-      max_month = args.month[0]
+  min_date = dateparser.parse(MIN_DATE)
+  max_date = dateparser.parse(MAX_DATE)
 
-    elif len(args.month) == 2 and args.month[0] >= MIN_MONTH and args.month[1] <= MAX_MONTH and args.month[0] <= args.month[1]:
-      min_month = args.month[0]
-      max_month = args.month[1]
+  if args.date:
+    date_pattern = re.compile("^[4-9]/\d{1,2}/16$")
+    
+    if len(args.date) == 2 and date_pattern.match(args.date[1]) and date_pattern.match(args.date[2]):
+      try:
+        temp1 = dateparser.parse(args.date[1])
+        temp2 = dateparser.parse(args.date[2])
+      else:
+        print("Invalid date(s) provided. They must also follow the format m/dd/yy.")
+        return
 
+      date1 = min(temp1, temp2)
+      date2 = max(temp1, temp2)
+
+      if date1 >= min_date and date2 <= max_date:
+        clinton_stats, trump_stats = compare_tweets(date1, date2)
+        response = create_response(date1, date2, clinton_stats, trump_stats)
+      else:
+        print("Your date range must fall between 4/17/16 and 9/29/16, inclusive")
+        return
     else:
-      print_error_message()
+      print("If using dates, exactly two must be provided.")
       return
-
   else:
-    min_month = MIN_MONTH
-    max_month = MAX_MONTH
+    clinton_stats, trump_stats = compare_tweets(min_date, max_date)
+    response = create_response(min_date, max_date, clinton_stats, trump_stats)
+
+  print(response + '\n')
 
   if args.phone:
     phone_pattern = re.compile("^\+1\d{10}$")
+    numbers_correct = True
     for phone_number in args.phone:
       if not phone_pattern.match(phone_number):
-        print_error
+        print("At least one phone number has been formatted incorrectly. Phone numbers must start with '+1', followed by ten numbers.")
+        numbers_correct = False
+        break
 
-    if phone_pattern.match(phone_number):
-      output = get_month_stats()
-      # sns.publish(PhoneNumber=phone_number, Message=output)
+    if numbers_correct:
+      session = boto3.Session(profile_name='default')
+      sns = session.client('sns')
+      for phone_number in args.phone:
+        # sns.publish(PhoneNumber=phone_number, Message=response)
 
+  if args.twitter:
+    twitter_pattern = re.compile("^[\w]{1,15}$")
+    handles_correct = True
+    for handle in args.twitter:
+      if not twitter_pattern.match(handle):
+        print("At least one Twitter handle has been formatted incorrectly.")
+        handles_correct = False
+        break
 
+    if handles_correct:
+      with open('twitter-creds.json') as f:
+        creds = json.load(f)
 
-  # if args.hello:
-  #   print(len(args.hello))
-
-  month_pattern = re.compile("^2016\-0[4-9]$")
-  email_pattern = re.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$")
-  
-  session = boto3.Session(profile_name='default')
-  sns = session.client('sns')
-
-  if len(argv) == 2:
-    if month_pattern.match(argv[1]):
-      output = get_month_stats(argv[1])
-      print(output)
-
-    elif phone_pattern.match(argv[1]):
-      output = get_all_months_stats(argv[1])
-      # sns.publish(PhoneNumber=argv[1], Message=output)
-
-  elif len(argv) == 3:
-    if month_pattern.match(argv[1]) and phone_pattern.match(argv[2]):
-      output = get_month_stats(argv[1])
-      # sns.publish(PhoneNumber=argv[1], Message=output)
-
-  else:
-    
-
-
-
-######################################################################
-# Tweet functions for all months
-######################################################################
-
-# def filter_all_tweets(tweets):
-#   clinton_tweets = []
-#   trump_tweets = []
-
-#   for tweet in tweets:
-#     if tweet['is_retweet'] == 'False':
-#       if tweet['handle'] == 'HillaryClinton':
-#         clinton_tweets.append(tweet)
-#       elif tweet['handle'] == 'realDonaldTrump':
-#         trump_tweets.append(tweet)
-
-#   return clinton_tweets, trump_tweets
-
-# def compare_all_tweets():
-#   tweets = read_tweets()
-#   clinton_tweets, trump_tweets = filter_all_tweets(tweets)
-
-#   clinton_stats = get_tweet_stats(clinton_tweets)
-#   trump_stats = get_tweet_stats(trump_tweets)
-
-#   return clinton_stats, trump_stats
+      client = Twython(creds['consumer_key'], creds['consumer_secret'], creds['access_token'], creds['access_token_secret'])
+      for handle in args.twitter:
+        msg = "@{} {}".format(handle, response)
+        client.update_status(status=msg)
