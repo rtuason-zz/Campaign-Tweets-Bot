@@ -1,3 +1,4 @@
+## Motivation and Implementation Overview
 Hillary won the popular vote by about three million votes, but how did her popularity fare against Donald Trump's during their campaigns? Attending a left-leaning college in a left-leaning area of California has undoubtedly skewed my view of how the general public feels about certain issues, given that I had attributed my opinions to common sense or clear-cut logic for a very long time, so I wanted to get a better look into how Americans on social media felt about each candidate over the course of several months.
 
 A dataset on Kaggle (https://www.kaggle.com/benhamner/clinton-trump-tweets) contains thousands of tweets from both presidential candidates between April and September of 2016, and given a range of dates, this bot allows us to examine how popular each one's tweets were.
@@ -9,7 +10,7 @@ Playing around with this bot using various date ranges has affirmed what I reali
 ## Notes
 The dataset contains tweets from Donald Trump starting in January, while it contains tweets from Hillary Clinton starting in April. To provide a valid comparison, the bot accepts starting dates from 4/17/16, which is when Clinton’s tweets start appearing in the dataset.
 
-One of the most interesting aspects of this bot is its acceptance of flags that allow for greater flexibility in terms of dates examined and output channels desired.
+One of the most interesting aspects of this bot is its acceptance of flags that allow for greater flexibility in terms of dates examined and output channels desired. No matter which output channels are given (phone numbers and Twitter handles), an analysis response will always be printed to the terminal.
 
 ## Flags
 #### --dates ####
@@ -21,5 +22,9 @@ Provide as many phone numbers (US only) as you'd like, barring AWS cost constrai
 #### --twitter ####
 Similar to the phone flag above. Don't include the '@' sign.
 
-## Usage Example
-python bot.py --dates 5/12/16 8/23/16 --phone 8001234567 --twitter cal_incidents
+## Usage Examples
+python bot.py
+
+python bot.py --phone 8001234567 --twitter cal_incidents realdonaldtrump
+
+python bot.py --dates 5/12/16 8/23/16 --phone 8001234567 8009876543 --twitter cal_incidents realdonaldtrump
