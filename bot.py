@@ -20,7 +20,6 @@ MAX_DATE = '9/29/16'  # Include tweets through 9/28/16 11:59pm
 ######################################################################
 # General tweet functions
 ######################################################################
-
 def fetch_tweets():
   if not exists(FILENAME):
     resp = requests.get(SRC_URL)
@@ -89,6 +88,8 @@ def create_response(date1, date2, clinton_stats, trump_stats):
 
   return output
 
+# The normal response is longer than 140 characters, so split it into 
+# two responses that the Twitter API will accept. 
 def create_twitter_response(date1, date2, clinton_stats, trump_stats):
   output1 = "From {date1} to {date2}, Hillary Clinton's {HC_num_tweets} tweets averaged {HC_retweet_avg} retweets and {HC_favorite_avg} favorites, while..."
   output2 = "Donald Trump's {DT_num_tweets} tweets averaged {DT_retweet_avg} retweets and {DT_favorite_avg} favorites."
@@ -109,7 +110,45 @@ def create_twitter_response(date1, date2, clinton_stats, trump_stats):
   return output1, output2
 
 ######################################################################
-# Analyze user input arguments
+# Send response as texts or tweets, if applicable
+######################################################################
+def send_texts(args, response):
+  if args.phone:
+    phone_pattern = re.compile("^\+1\d{10}$")
+    for phone_number in args.phone:
+      if not phone_pattern.match(phone_number):
+        print("At least one phone number has been formatted incorrectly. Phone numbers must start with '+1', followed by ten numbers.")
+        return   # Don't exit program. There might be Twitter handles.
+
+    session = boto3.Session(profile_name='default')
+    sns = session.client('sns')
+    for phone_number in args.phone:
+      sns.publish(PhoneNumber='+1' + phone_number, Message=response)
+
+def send_tweets(args, date1, date2, clinton_stats, trump_stats):
+  if args.twitter:
+    twitter_pattern = re.compile("^[\w]{1,15}$")
+    for handle in args.twitter:
+      if not twitter_pattern.match(handle):
+        print("At least one Twitter handle has been formatted incorrectly.")
+        return
+
+    with open('twitter-creds.json') as f:
+      creds = json.load(f)
+
+    client = Twython(creds['consumer_key'], creds['consumer_secret'], creds['access_token'], creds['access_token_secret'])
+
+    response1, response2 = create_twitter_response(date1, date2, clinton_stats, trump_stats)
+
+    for handle in args.twitter:
+      msg1 = "@{} {}".format(handle, response1)
+      msg2 = "@{} {}".format(handle, response2)
+      client.update_status(status=msg1)
+      client.update_status(status=msg2)
+
+######################################################################
+# Analyze user input arguments and provide tweet stats pertaining to 
+# a range of dates to given output channels
 ######################################################################
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -132,8 +171,8 @@ if __name__ == '__main__':
         print("Invalid date(s) provided. They must also follow the format m/dd/yy.")
         exit()
 
-      date1 = min(temp1, temp2)
-      date2 = max(temp1, temp2)
+      date1 = min(temp1, temp2)   # Make sure that date1 is always
+      date2 = max(temp1, temp2)   # before or the same date as date2
 
       if date1 >= min_date and date2 <= max_date:
         clinton_stats, trump_stats = compare_tweets(date1, date2)
@@ -149,42 +188,7 @@ if __name__ == '__main__':
     date1, date2 = min_date, max_date
     response = create_response(date1, date2, clinton_stats, trump_stats)
 
-  print(response + '\n')
+  print(response)
 
-  if args.phone:
-    phone_pattern = re.compile("^\+1\d{10}$")
-    numbers_correct = True
-    for phone_number in args.phone:
-      if not phone_pattern.match(phone_number):
-        print("At least one phone number has been formatted incorrectly. Phone numbers must start with '+1', followed by ten numbers.")
-        numbers_correct = False
-        break   # Don't exit. There might be Twitter handles.
-
-    if numbers_correct:
-      session = boto3.Session(profile_name='default')
-      sns = session.client('sns')
-      for phone_number in args.phone:
-        sns.publish(PhoneNumber=phone_number, Message=response)
-
-  if args.twitter:
-    twitter_pattern = re.compile("^[\w]{1,15}$")
-    handles_correct = True
-    for handle in args.twitter:
-      if not twitter_pattern.match(handle):
-        print("At least one Twitter handle has been formatted incorrectly.")
-        handles_correct = False
-        break
-
-    if handles_correct:
-      with open('twitter-creds.json') as f:
-        creds = json.load(f)
-
-      client = Twython(creds['consumer_key'], creds['consumer_secret'], creds['access_token'], creds['access_token_secret'])
-
-      response1, response2 = create_twitter_response(date1, date2, clinton_stats, trump_stats)
-
-      for handle in args.twitter:
-        msg1 = "@{} {}".format(handle, response1)
-        msg2 = "@{} {}".format(handle, response2)
-        client.update_status(status=msg1)
-        client.update_status(status=msg2)
+  send_texts(args, response)
+  send_tweets(args, date1, date2, clinton_stats, trump_stats)  
