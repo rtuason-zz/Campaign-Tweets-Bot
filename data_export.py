@@ -9,7 +9,7 @@ def send_texts(args, response):
     for phone_number in args.phone:
       if not phone_pattern.match(phone_number):
         print("At least one phone number has been formatted incorrectly. Phone numbers must contain exactly ten numbers.")
-        return   # Don't exit program. There might be Twitter handles.
+        return
 
     session = boto3.Session(profile_name='default')
     sns = session.client('sns')
