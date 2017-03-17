@@ -1,46 +1,16 @@
-from os import makedirs
-from os.path import exists
-from os.path import join
-from io import BytesIO
-from zipfile import ZipFile
-from urllib.request import urlopen
-import argparse
-
-import csv
-import json
-import requests
-import re
-import calendar
+from data_import import read_tweets
+from data_export import send_texts, send_tweets
 from dateutil import parser as dateparser
 
-import boto3
-from twython import Twython
-
-SRC_URL = 'http://stash.compciv.org/2017/kaggletrumptweets.zip'
-DATA_DIR = 'data'
-RAW_FILENAME = 'campaign_tweets.csv'
+import argparse
+import re
 
 MIN_DATE = '4/17/16'
 MAX_DATE = '9/29/16'  # Include tweets through 9/28/16 11:59pm
 
 ######################################################################
-# General tweet functions
+# Tweet functions for a range of dates
 ######################################################################
-def fetch_tweets(filename):
-  if not exists(filename):
-    url = urlopen(SRC_URL)
-    zipfile = ZipFile(BytesIO(url.read()))
-    zipfile.extractall(DATA_DIR)
-
-def read_tweets():
-  makedirs(DATA_DIR, exist_ok=True)
-  filename = join(DATA_DIR, RAW_FILENAME)
-
-  fetch_tweets(filename)
-  with open(filename, 'r') as f:
-    tweets = list(csv.DictReader(f))
-    return tweets
-
 def get_tweet_stats(tweets):
   retweet_sum = 0
   favorite_sum = 0
@@ -55,9 +25,6 @@ def get_tweet_stats(tweets):
 
   return num_tweets, retweet_avg, favorite_avg
 
-######################################################################
-# Tweet functions for a range of dates
-######################################################################
 def filter_tweets(tweets, handle, date1, date2):
   results = []
   for tweet in tweets:
@@ -119,43 +86,6 @@ def create_twitter_response(date1, date2, clinton_stats, trump_stats):
   return output1, output2
 
 ######################################################################
-# Send response as texts or tweets, if applicable
-######################################################################
-def send_texts(args, response):
-  if args.phone:
-    phone_pattern = re.compile("^\+1\d{10}$")
-    for phone_number in args.phone:
-      if not phone_pattern.match(phone_number):
-        print("At least one phone number has been formatted incorrectly. Phone numbers must start with '+1', followed by ten numbers.")
-        return   # Don't exit program. There might be Twitter handles.
-
-    session = boto3.Session(profile_name='default')
-    sns = session.client('sns')
-    for phone_number in args.phone:
-      sns.publish(PhoneNumber='+1' + phone_number, Message=response)
-
-def send_tweets(args, date1, date2, clinton_stats, trump_stats):
-  if args.twitter:
-    twitter_pattern = re.compile("^[\w]{1,15}$")
-    for handle in args.twitter:
-      if not twitter_pattern.match(handle):
-        print("At least one Twitter handle has been formatted incorrectly.")
-        return
-
-    with open('twitter-creds.json') as f:
-      creds = json.load(f)
-
-    client = Twython(creds['consumer_key'], creds['consumer_secret'], creds['access_token'], creds['access_token_secret'])
-
-    response1, response2 = create_twitter_response(date1, date2, clinton_stats, trump_stats)
-
-    for handle in args.twitter:
-      msg1 = "@{} {}".format(handle, response1)
-      msg2 = "@{} {}".format(handle, response2)
-      client.update_status(status=msg1)
-      client.update_status(status=msg2)
-
-######################################################################
 # Analyze user input arguments and provide tweet stats pertaining to 
 # a range of dates to given output channels
 ######################################################################
@@ -198,6 +128,8 @@ if __name__ == '__main__':
     response = create_response(date1, date2, clinton_stats, trump_stats)
 
   print(response)
+  
+  twitter_resp1, twitter_resp2 = create_twitter_response(date1, date2, clinton_stats, trump_stats)
 
   send_texts(args, response)
-  send_tweets(args, date1, date2, clinton_stats, trump_stats)  
+  send_tweets(args, twitter_resp1, twitter_resp2)  
