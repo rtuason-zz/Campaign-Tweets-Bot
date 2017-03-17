@@ -28,3 +28,6 @@ python bot.py
 python bot.py --phone 8001234567 --twitter cal_incidents realdonaldtrump
 
 python bot.py --dates 5/12/16 8/23/16 --phone 8001234567 8009876543 --twitter cal_incidents realdonaldtrump
+
+## Sample Output
+"From Apr 17, 2016 to Sep 29, 2016, Hillary Clinton's 2,629 tweets averaged 3,098.51 retweets and 7,012.57 favorites, while Donald Trump's 1,632 tweets averaged 7,824.86 retweets and 22,703.50 favorites."
