@@ -4,7 +4,6 @@ from os.path import join
 from io import BytesIO
 from zipfile import ZipFile
 from urllib.request import urlopen
-
 import csv
 
 SRC_URL = 'http://stash.compciv.org/2017/kaggletrumptweets.zip'

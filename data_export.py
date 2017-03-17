@@ -3,9 +3,6 @@ import json
 import boto3
 from twython import Twython
 
-######################################################################
-# Send response as texts or tweets, if applicable
-######################################################################
 def send_texts(args, response):
   if args.phone:
     phone_pattern = re.compile("^\d{10}$")
@@ -19,7 +16,7 @@ def send_texts(args, response):
     for phone_number in args.phone:
       sns.publish(PhoneNumber='+1' + phone_number, Message=response)
 
-def send_tweets(args, twitter_resp1, twitter_resp2) :
+def send_tweets(args, twitter_resp1, twitter_resp2):
   if args.twitter:
     twitter_pattern = re.compile("^[\w]{1,15}$")
     for handle in args.twitter:
