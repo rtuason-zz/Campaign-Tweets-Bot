@@ -21,7 +21,7 @@ def send_tweets(args, twitter_resp1, twitter_resp2):
     twitter_pattern = re.compile("^[\w]{1,15}$")
     for handle in args.twitter:
       if not twitter_pattern.match(handle):
-        print("At least one Twitter handle has been formatted incorrectly.")
+        print("At least one Twitter handle has been formatted incorrectly. Do not include '@' in your handle inputs.")
         return
 
     with open('twitter-creds.json') as f:
