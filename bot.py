@@ -1,4 +1,9 @@
+from os import makedirs
 from os.path import exists
+from os.path import join
+from io import BytesIO
+from zipfile import ZipFile
+from urllib.request import urlopen
 import argparse
 
 import csv
@@ -11,8 +16,9 @@ from dateutil import parser as dateparser
 import boto3
 from twython import Twython
 
-SRC_URL = 'https://stanford.edu/~rtuason/campaign_tweets.csv'
-FILENAME = 'campaign-tweets.csv'
+SRC_URL = 'http://stash.compciv.org/2017/kaggletrumptweets.zip'
+DATA_DIR = 'data'
+RAW_FILENAME = 'campaign_tweets.csv'
 
 MIN_DATE = '4/17/16'
 MAX_DATE = '9/29/16'  # Include tweets through 9/28/16 11:59pm
@@ -20,15 +26,18 @@ MAX_DATE = '9/29/16'  # Include tweets through 9/28/16 11:59pm
 ######################################################################
 # General tweet functions
 ######################################################################
-def fetch_tweets():
-  if not exists(FILENAME):
-    resp = requests.get(SRC_URL)
-    with open(FILENAME, 'wb') as f:
-      f.write(resp.content)
+def fetch_tweets(filename):
+  if not exists(filename):
+    url = urlopen(SRC_URL)
+    zipfile = ZipFile(BytesIO(url.read()))
+    zipfile.extractall(DATA_DIR)
 
 def read_tweets():
-  fetch_tweets()
-  with open(FILENAME, 'r') as f:
+  makedirs(DATA_DIR, exist_ok=True)
+  filename = join(DATA_DIR, RAW_FILENAME)
+
+  fetch_tweets(filename)
+  with open(filename, 'r') as f:
     tweets = list(csv.DictReader(f))
     return tweets
 
